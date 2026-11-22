@@ -8,6 +8,10 @@
 - summaries           汇总结果快照（生成时的计算结果）
 - summary_groups      汇总实际收录的样组（已去重）
 - summary_blanks      汇总生成时采用的空白样数据快照（查旧汇总时原样返回）
+- restorations        样组复原批次（同一指标、单位）
+- restoration_tables  每批提交的旧汇总表合计（表号、样组号、各项合计）
+- restored_groups     复原样组：所属批次与原件核验状态（pending/verified/conflict）
+- restored_group_tables 复原样组 ↔ 所用表号
 """
 from __future__ import annotations
 
@@ -69,6 +73,39 @@ CREATE TABLE IF NOT EXISTS summary_blanks (
     deduction   REAL NOT NULL,
     variance    REAL NOT NULL,
     PRIMARY KEY (summary_id, blank_id)
+);
+
+CREATE TABLE IF NOT EXISTS restorations (
+    restoration_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    analyte    TEXT NOT NULL,
+    unit       TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS restoration_tables (
+    restoration_id INTEGER NOT NULL REFERENCES restorations (restoration_id),
+    table_id       TEXT NOT NULL,
+    reading_total  INTEGER NOT NULL,
+    variance_total INTEGER NOT NULL,
+    group_ids      TEXT NOT NULL,  -- JSON：表内样组号
+    blank_usages   TEXT NOT NULL,  -- JSON：{空白样编号: 总使用次数}
+    PRIMARY KEY (restoration_id, table_id)
+);
+
+CREATE TABLE IF NOT EXISTS restored_groups (
+    group_id            TEXT PRIMARY KEY REFERENCES sample_groups (group_id),
+    restoration_id      INTEGER NOT NULL REFERENCES restorations (restoration_id),
+    verification_status TEXT NOT NULL DEFAULT 'pending'
+                        CHECK (verification_status IN ('pending', 'verified', 'conflict')),
+    verified_at         TEXT,
+    conflict            TEXT,  -- JSON：最近一次冲突报送的内容与差异
+    created_at          TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS restored_group_tables (
+    group_id TEXT NOT NULL REFERENCES restored_groups (group_id),
+    table_id TEXT NOT NULL,
+    PRIMARY KEY (group_id, table_id)
 );
 """
 
